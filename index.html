@@ -150,11 +150,11 @@
                 setTimeout(() => setClickCount(0), 3000);
             };
 
-            const handleFileUpload = async (event) => {
+          const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !supabaseClient) return;
 
-    setImportStatus({ processing: true, count: 0, logs: ["📡 ปรับจูนโครงสร้างอิสระ..."] });
+    setImportStatus({ processing: true, count: 0, logs: ["📡 ล็อกเป้าหมาย: เริ่มการสแกน..."] });
     
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -162,42 +162,23 @@
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            const json = XLSX.utils.sheet_to_json(sheet);
             
-            // ระบบสแกนหัวตารางอัตโนมัติ
-            const rawHeader = rows[0].map(h => String(h || "").trim());
-            const findIdx = (keywords) => rawHeader.findIndex(h => keywords.some(k => h.includes(k)));
+            // ใช้ Map ข้อมูลแบบ 1:1 กับหัวคอลัมน์ในไฟล์ที่อัปโหลดมาล่าสุด
+            const batch = json.map(row => ({
+                tracking_no: String(row['เลขพัสดุ'] || "").trim(),
+                consignee_name: String(row['ชื่อผู้รับ'] || "ลูกค้า VIP").trim(),
+                phone_no: String(row['เบอร์ผู้รับ'] || "").replace(/\D/g, ""),
+                cod_amount: parseFloat(String(row['ยอดCOD'] || "0").replace(/[^0-9.]/g, "")) || 0,
+                status: "SHIPPED",
+                updated_at: new Date().toISOString()
+            })).filter(r => r.tracking_no.length > 5);
+
+            const { error } = await supabaseClient.from('parcels').upsert(batch, { onConflict: 'tracking_no' });
             
-            const idx = {
-                track: findIdx(["เลขพัสดุ", "พัสดุ", "Order ID"]),
-                name: findIdx(["ชื่อผู้รับ", "ชื่อ", "Customer"]),
-                phone: findIdx(["เบอร์ผู้รับ", "เบอร์", "Phone"]),
-                cod: findIdx(["ยอดCOD", "ยอดเงิน", "COD"]),
-                address: findIdx(["ที่อยู่ที่รับ", "ที่อยู่", "Address"])
-            };
-
-            const batch = [];
-            for(let i = 1; i < rows.length; i++) {
-                const row = rows[i];
-                const trackVal = row[idx.track > -1 ? idx.track : 3]; // Fallback ไปที่คอลัมน์ 4 ถ้าหาไม่เจอ
-                if (!trackVal) continue;
-
-                batch.push({
-                    tracking_no: String(trackVal).trim().toUpperCase(),
-                    phone_no: String(row[idx.phone > -1 ? idx.phone : 11] || "").replace(/\D/g, ""),
-                    consignee_name: String(row[idx.name > -1 ? idx.name : 10] || "ลูกค้า VIP").trim(),
-                    address: String(row[idx.address > -1 ? idx.address : 13] || ""),
-                    cod_amount: parseFloat(String(row[idx.cod > -1 ? idx.cod : 20] || "0").replace(/[^0-9.]/g, "")) || 0,
-                    status: "SHIPPED",
-                    updated_at: new Date().toISOString()
-                });
-            }
-
-            // [TABLE_NAME] ถูกดึงมาจากตัวแปรด้านบนแบบไดนามิก
-            const { error } = await supabaseClient.from(TABLE_NAME).upsert(batch, { onConflict: 'tracking_no' });
             if (error) throw error;
             
-            setImportStatus({ processing: false, count: batch.length, logs: ["✅ ภารกิจสำเร็จ: อัปโหลดสู่ตาราง " + TABLE_NAME + " เรียบร้อย"] });
+            setImportStatus({ processing: false, count: batch.length, logs: ["✅ สำเร็จ: บรรจุออเดอร์เข้าตาราง 'parcels' ทั้งหมด " + batch.length + " รายการ"] });
             fetchAdminData();
         } catch (err) {
             setImportStatus({ processing: false, count: 0, logs: ["❌ ERROR: " + err.message] });
