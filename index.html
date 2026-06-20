@@ -2,183 +2,218 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>EMPIRE COMMAND CENTER V48.5 | PRODUCTION FIX</title>
-    <!-- 
-    ==========================================================================
-    🛡️ THE IMMUTABLE PROTOCOL (VERCEL PRODUCTION FIX EDITION)
-    ==========================================================================
-    -->
-    <script src="https://unpkg.com"></script>
-    <script src="https://unpkg.com"></script>
-    <script src="https://unpkg.com"></script>
-    <script src="https://tailwindcss.com"></script>
-    <link href="https://googleapis.com" rel="stylesheet">
-    <style id="theme-style">
-        :root { --neon-theme: #ff6600; --dark-bg: #050000; }
-        body { background-color: var(--dark-bg); color: white; font-family: 'Bai Jamjuree', sans-serif; overflow-x: hidden; }
-        .cyber-font { font-family: 'Orbitron', sans-serif; }
-        .glass-panel { background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(40px); border: 1px solid rgba(255, 255, 255, 0.03); }
-        .neon-glow { text-shadow: 0 0 10px var(--neon-theme), 0 0 20px var(--neon-theme); }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--neon-theme); }
-        .btn-active { background: var(--neon-theme); box-shadow: 0 0 20px var(--neon-theme); color: white; }
-        .msg-box { position: fixed; bottom: 20px; right: 20px; left: 20px; padding: 20px; border-radius: 4px; z-index: 1000; text-align: center; }
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EMPIRE COMMAND CENTER V43 - CHAT INTEL</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sriracha&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', 'Sriracha', sans-serif; background-color: #05000a; color: #a78bfa; margin: 0; }
+        .neon-glow { text-shadow: 0 0 15px #7c3aed, 0 0 30px rgba(124,58,237,0.5); }
+        .glass-card { 
+            background: rgba(255, 255, 255, 0.02); 
+            backdrop-filter: blur(50px); 
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        @keyframes pulse-opacity { 0%, 100% { opacity: 0.03; } 50% { opacity: 0.1; } }
+        .bg-pulse { animation: pulse-opacity 5s infinite; }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="overflow-x-hidden selection:bg-[#7c3aed] selection:text-white pb-32">
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+    <div class="fixed inset-0 bg-pulse bg-radial from-[#7c3aed] via-transparent to-transparent pointer-events-none z-0"></div>
 
-        const SUPABASE_URL = "https://supabase.co";
-        const SUPABASE_KEY = "sb_publishable__jf6STEu_EO57bk21V4MXw_MFLkBbHu";
-        const TABLE_NAME = "parcels"; 
+    <div class="relative z-10 max-w-7xl mx-auto px-6 pt-12">
+        <!-- 🧭 Header & Empire Clock (นากา) -->
+        <header class="flex flex-col lg:flex-row justify-between items-center border-b border-white/5 pb-12 mb-12 gap-8">
+            <div class="text-center lg:text-left">
+                <h1 class="text-6xl md:text-8xl font-black italic tracking-tighter uppercase text-[#7c3aed] neon-glow leading-none">BB EMPIRE</h1>
+                <p class="text-gray-600 text-[10px] font-black uppercase tracking-[1.5em] italic opacity-50 mt-4">Chat Intelligence Sovereign V43.0</p>
+            </div>
+            <div class="bg-[#0f071a] border border-[#3d1a6d] px-12 py-8 rounded-[3rem] shadow-[0_0_60px_rgba(124,58,237,0.25)] text-center relative overflow-hidden">
+                <p class="text-[10px] text-[#7c3aed] font-black uppercase tracking-widest mb-3 italic">Empire Standard Time</p>
+                <div id="clock" class="text-6xl font-mono font-black text-white tracking-widest leading-none">00:00:00</div>
+            </div>
+        </header>
 
-        function App() {
-            const [supabaseClient, setSupabaseClient] = useState(null);
-            const [currentTime, setCurrentTime] = useState(new Date());
-            const [message, setMessage] = useState(null);
-            const [stats, setStats] = useState({ totalOrders: 0, totalCOD: 0, todayCOD: 0 });
-            const [orders, setOrders] = useState([]);
-            
-            const [isProcessing, setIsProcessing] = useState(false);
-            const [cleanedData, setCleanedData] = useState([]);
-            const [cleansingSummary, setCleansingSummary] = useState({ totalRaw: 0, validCount: 0, fixedPhoneCount: 0, skippedCount: 0 });
-            const [processLogs, setProcessLogs] = useState([]);
+        <nav class="flex justify-center gap-6 mb-16 overflow-x-auto no-scrollbar py-4">
+            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="tab-btn px-12 py-6 rounded-[2.5rem] border-2 border-[#7c3aed] bg-[#7c3aed] text-white font-black text-xs uppercase tracking-[0.2em] transition-all">📊 Dashboard</button>
+            <button onclick="switchTab('chat')" id="btn-chat" class="tab-btn px-12 py-6 rounded-[2.5rem] border-2 border-white/5 bg-white/5 text-gray-500 font-black text-xs uppercase tracking-[0.2em] transition-all">💬 Chat Intel</button>
+            <button onclick="switchTab('ops')" id="btn-ops" class="tab-btn px-12 py-6 rounded-[2.5rem] border-2 border-white/5 bg-white/5 text-gray-500 font-black text-xs uppercase tracking-[0.2em] transition-all">📥 Command</button>
+        </nav>
 
-            const EMPIRE_GOAL = 100000;
+        <!-- 📊 Dashboard Section -->
+        <div id="tab-dashboard" class="tab-content animate-in fade-in duration-700">
+            <div class="grid grid-cols-1 xl:grid-cols-4 gap-12 mb-16">
+                <div class="xl:col-span-1 glass-card p-16 rounded-[4.5rem] text-center border-l-8 border-[#7c3aed]">
+                    <p class="text-gray-600 text-[11px] font-black uppercase tracking-widest mb-4 italic">Total Houses</p>
+                    <p id="stat-orders" class="text-9xl font-black text-[#7c3aed] italic leading-none">0</p>
+                </div>
+                <div class="xl:col-span-3 glass-card p-16 rounded-[4.5rem] flex flex-col justify-center relative overflow-hidden">
+                    <p class="text-gray-600 text-[11px] font-black uppercase tracking-widest mb-6 italic">Total COD Balance</p>
+                    <p id="stat-cod" class="text-7xl md:text-[12rem] font-black text-white italic leading-none drop-shadow-2xl">฿0</p>
+                </div>
+            </div>
+        </div>
 
-            const showToast = (txt, type = 'success') => {
-                setMessage({ text: txt, type });
-                setTimeout(() => setMessage(null), 4000);
-            };
+        <!-- 💬 Chat Intel Section -->
+        <div id="tab-chat" class="tab-content hidden animate-in slide-in-from-bottom-10 duration-700">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 glass-card p-10 rounded-[4rem]">
+                    <div class="flex items-center justify-between mb-8">
+                        <h2 class="text-2xl font-black italic flex items-center gap-3 text-white uppercase">
+                            <i data-lucide="message-square" class="text-[#7c3aed]"></i> Incoming Ghost Messages
+                        </h2>
+                        <span class="text-[10px] font-black text-green-500 animate-pulse">POLLING ACTIVE</span>
+                    </div>
+                    <div id="chat-logs" class="space-y-4 h-[500px] overflow-y-auto custom-scrollbar pr-4 font-mono text-xs">
+                        <!-- Polled messages will appear here -->
+                    </div>
+                </div>
+                <div class="lg:col-span-1 space-y-8">
+                    <div class="glass-card p-10 rounded-[4rem] border-t-4 border-[#7c3aed]">
+                        <h3 class="text-lg font-black text-white mb-6 uppercase italic">Quick Reply Matrix</h3>
+                        <div class="space-y-3">
+                            <button class="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-[#a78bfa] hover:bg-[#7c3aed] hover:text-white transition-all">ส่งเลขพัสดุ (Auto)</button>
+                            <button class="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-[#a78bfa] hover:bg-[#7c3aed] hover:text-white transition-all">ยืนยันยอดโอน (VIP)</button>
+                            <button class="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-[#a78bfa] hover:bg-[#7c3aed] hover:text-white transition-all">ขออภัยสินค้าหมด</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-            // 🔥 แก้ไขจุดบกพร่องเรียกโครงสร้างไฟล์ CDN สำหรับ Vercel โดยเฉพาะ
-            useEffect(() => {
-                const initScripts = async () => {
-                    try {
-                        // โหลด Supabase เจนเนอเรชันมาตรฐาน
-                        if (!window.supabase) {
-                            const sb = document.createElement('script');
-                            sb.src = 'https://jsdelivr.net';
-                            sb.async = true;
-                            sb.onload = () => {
-                                if (window.supabase) {
-                                    setSupabaseClient(window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY));
-                                }
-                            };
-                            document.body.appendChild(sb);
-                        } else {
-                            setSupabaseClient(window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY));
-                        }
-                        
-                        // เปลี่ยน CDN ของ ตารางสเปรดชีต (SheetJS) เป็นลิงก์ที่เสถียรบนระบบเซิร์ฟเวอร์จริง
-                        if (!window.XLSX) {
-                            const xlsx = document.createElement('script');
-                            xlsx.src = 'https://cloudflare.com';
-                            xlsx.async = true;
-                            document.body.appendChild(xlsx);
-                        }
-                    } catch (err) {
-                        console.error("CDN Loading Error:", err);
+        <!-- 📥 Command Section (Loader) -->
+        <div id="tab-ops" class="tab-content hidden animate-in zoom-in-95 duration-700">
+            <div class="max-w-5xl mx-auto mt-20 grid grid-cols-1 md:grid-cols-2 gap-16">
+                <div class="glass-card p-24 rounded-[6rem] text-center relative group cursor-pointer hover:bg-[#1a0b2e] transition-all">
+                    <input type="file" id="file-upload" accept=".xls,.xlsx" class="absolute inset-0 opacity-0 cursor-pointer z-20">
+                    <div class="text-[12rem] mb-10 group-hover:scale-110 transition-transform">📂</div>
+                    <h2 class="text-5xl font-black uppercase italic text-white">LOADER</h2>
+                </div>
+                <div id="import-logs" class="bg-black/90 rounded-[6rem] p-12 font-mono text-[12px] h-[500px] overflow-y-auto border border-white/5 text-gray-600 custom-scrollbar">
+                    <p class="text-[#7c3aed] font-black border-b border-white/5 pb-6 mb-10">#>>> SYSTEM_OPS_LOG</p>
+                    <div id="logs-container" class="space-y-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="fixed bottom-0 left-0 w-full py-12 bg-[#05000a]/95 backdrop-blur-3xl border-t border-white/5 text-center z-50">
+        <p class="text-[11px] text-gray-800 font-black uppercase tracking-[5em] italic opacity-30">The Chat Sovereign • V43.0 • Ghost Protocol</p>
+    </footer>
+
+    <script>
+        const SUPABASE_URL = "https://nlgecesyjcrrqwiitlyt.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_1agyo85-Uxq1VAllYjl1gg_M_utlMbw";
+        let supabaseClient;
+        let allOrders = [];
+
+        window.onload = () => {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            updateClock();
+            setInterval(updateClock, 1000);
+            fetchData();
+            lucide.createIcons();
+            simulateChatPolling();
+        };
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('th-TH', { hour12: false });
+        }
+
+        async function fetchData() {
+            const { data, error } = await supabaseClient.from("parcels_bb").select("*").order("created_at", { ascending: false });
+            if (!error && data) {
+                allOrders = data;
+                renderDashboard();
+            }
+        }
+
+        function renderDashboard() {
+            const totalCOD = allOrders.reduce((sum, item) => sum + Number(item.cod_amount || 0), 0);
+            document.getElementById('stat-orders').innerText = allOrders.length;
+            document.getElementById('stat-cod').innerText = '฿' + totalCOD.toLocaleString();
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.replace('bg-[#7c3aed]', 'bg-white/5');
+                btn.classList.replace('text-white', 'text-gray-500');
+                btn.classList.replace('border-[#7c3aed]', 'border-white/5');
+            });
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.classList.replace('bg-white/5', 'bg-[#7c3aed]');
+            activeBtn.classList.replace('text-gray-500', 'text-white');
+            activeBtn.classList.replace('border-white/5', 'border-[#7c3aed]');
+        }
+
+        function simulateChatPolling() {
+            const chats = [
+                { user: "ลูกค้า VIP #201", msg: "สอบถามเลขพัสดุครับ เบอร์ 081234xxxx", intent: "🛰️ TRACKING" },
+                { user: "ลูกค้าใหม่", msg: "สนใจม่อนรุ้ง 2 คอตครับ มีของไหม", intent: "💰 SALES" },
+                { user: "สมาชิกเงามืด", msg: "โอนแล้วนะครับ สลิปส่งในแชทแล้ว", intent: "💰 MONEY_IN" }
+            ];
+            const container = document.getElementById('chat-logs');
+            chats.forEach((chat, i) => {
+                setTimeout(() => {
+                    const div = document.createElement('div');
+                    div.className = "p-5 bg-black/40 border border-white/5 rounded-2xl animate-in fade-in slide-in-from-left-5 mb-3";
+                    div.innerHTML = `
+                        <div class="flex justify-between mb-2 text-[10px] font-black uppercase tracking-widest">
+                            <span class="text-[#7c3aed]">${chat.user}</span>
+                            <span class="text-green-500">${chat.intent}</span>
+                        </div>
+                        <p class="text-gray-400 text-sm font-medium">${chat.msg}</p>
+                    `;
+                    container.prepend(div);
+                }, i * 2000);
+            });
+        }
+
+        document.getElementById('file-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            addLog("🕵️ กำลังสแกนคลังแสงข้อมูล...");
+            reader.onload = async (evt) => {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+                const batch = [];
+                rows.slice(1).forEach(row => {
+                    if (row[2] && String(row[2]).toUpperCase().startsWith("TH")) {
+                        batch.push({
+                            tracking_no: String(row[2]).trim().toUpperCase(),
+                            phone_no: String(row[4] || "").replace(/\D/g, ""),
+                            consignee_name: String(row[3] || "ลูกค้า VIP").trim(),
+                            cod_amount: parseFloat(String(row[9] || "0").replace(/,/g, "")) || 0
+                        });
                     }
-                };
-                
-                initScripts();
-                const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-                return () => clearInterval(timer);
-            }, []);
-
-            useEffect(() => {
-                if (supabaseClient) fetchAdminData();
-            }, [supabaseClient]);
-
-            const fetchAdminData = async () => {
-                if (!supabaseClient) return;
-                try {
-                    const { data, error } = await supabaseClient.from(TABLE_NAME).select("*").order("created_at", { ascending: false });
-                    if (!error && data) {
-                        const totalCOD = data.reduce((sum, item) => sum + Number(item.cod || 0), 0);
-                        const todayStr = new Date().toLocaleDateString('en-CA');
-                        const todayCOD = data
-                            .filter(item => item.created_at && item.created_at.startsWith(todayStr))
-                            .reduce((sum, item) => sum + Number(item.cod || 0), 0);
-                        setOrders(data);
-                        setStats({ totalOrders: data.length, totalCOD, todayCOD });
+                });
+                if (batch.length > 0) {
+                    const { error } = await supabaseClient.from("parcels_bb").upsert(batch, { onConflict: 'tracking_no' });
+                    if (!error) {
+                        addLog(`🔥 บรรจุกระสุน ${batch.length} นัด สำเร็จ!`);
+                        fetchData();
                     }
-                } catch (e) { console.error(e); }
+                }
             };
+            reader.readAsArrayBuffer(file);
+        });
 
-            const cleanPhoneNumber = (phoneRaw) => {
-                if (!phoneRaw) return { cleanStr: '', isFixed: false };
-                let num = String(phoneRaw).replace(/[^0-9]/g, '').trim(); 
-                let isFixed = false;
-
-                if (num.startsWith('66')) {
-                    num = '0' + num.slice(2);
-                    isFixed = true;
-                }
-                if (num.length > 10 && num.startsWith('00')) {
-                    num = num.slice(1);
-                    isFixed = true;
-                }
-                if (num !== String(phoneRaw).trim()) isFixed = true;
-
-                return { cleanStr: num, isFixed };
-            };
-
-            const processUniversalFile = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                if (!window.XLSX) {
-                    showToast("⏳ ระบบกำลังดึงโมดูลอ่านไฟล์คอมพิวเตอร์ กรุณาลองอีกครั้งใน 2 วินาที", "warning");
-                    return;
-                }
-
-                setIsProcessing(true);
-                setProcessLogs(["⚙️ เริ่มอ่านโครงสร้างโมเดลไฟล์..."]);
-                
-                const reader = new FileReader();
-                reader.onload = async (evt) => {
-                    try {
-                        const bstr = evt.target.result;
-                        const wb = window.XLSX.read(bstr, { type: 'binary' });
-                        const ws = wb.Sheets[wb.SheetNames[0]];
-                        const rawRows = window.XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-                        if (rawRows.length === 0) throw new Error("ไม่พบแถวข้อมูลในสเปรดชีต");
-
-                        let headerIndex = 0;
-                        let mappings = { tracking: -1, name: -1, phone: -1, address: -1, cod: -1 };
-
-                        const trackingKeywords = ['รหัส', 'พัสดุ', 'tracking', 'track', 'id', 'เลขพัสดุ'];
-                        const nameKeywords = ['ชื่อ', 'ผู้รับ', 'customer', 'name', 'ลูกค้า'];
-                        const phoneKeywords = ['เบอร์', 'โทร', 'phone', 'tel', 'mobile'];
-                        const addressKeywords = ['ที่อยู่', 'address', 'location', 'ส่งที่'];
-                        const codKeywords = ['cod', 'ยอดเก็บ', 'เงินปลายทาง', 'ราคา', 'amount', 'ยอดรวม'];
-
-                        for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
-                            const row = rawRows[i];
-                            if (!row) continue;
-                            row.forEach((cell, cellIdx) => {
-                                if (!cell) return;
-                                const val = String(cell).toLowerCase().trim();
-                                if (trackingKeywords.some(k => val.includes(k)) && mappings.tracking === -1) mappings.tracking = cellIdx;
-                                if (nameKeywords.some(k => val.includes(k)) && mappings.name === -1) mappings.name = cellIdx;
-                                if (phoneKeywords.some(k => val.includes(k)) && mappings.phone === -1) mappings.phone = cellIdx;
-                                if (addressKeywords.some(k => val.includes(k)) && mappings.address === -1) mappings.address = cellIdx;
-                                if (codKeywords.some(k => val.includes(k)) && mappings.cod === -1) mappings.cod = cellIdx;
-                            });
-                            if (mappings.tracking !== -1) { headerIndex = i; break; }
-                        }
-
-                        if (mappings.tracking === -1) {
-                            mappings = { tracking: 0, name: 1, phone: 2, address: 3, cod: 5 };
-                            setProcessLogs(prev => [...prev, "⚠️ ไม่พบชื่อหัวข้อหลัก จัดข้อมูลแบบดิฟอลต์ (A-F) ให้แทน"]);
-                        } else {
-                            setProcessLogs(prev => [...prev, `🎯 ล็อกพิกัดหัวตารางจริงอัตโนมัติที่บรรทัด ${headerIndex + 1}`]);
-                        }
-const dataRows = rawRows.slice(headerIndex + 1);const listCleaned = [];let validCount = 0;let fixedPhoneCount = 0;let skippedCount = 0;dataRows.forEach((row) => {if (!row || !row[mappings.tracking]) { skippedCount++; return; }const rawPhone = row[mappings.phone] || '';const { cleanStr: cleanPhone, isFixed } = cleanPhoneNumber(rawPhone);if (isFixed) fixedPhoneCount++;validCount++;listCleaned.push({track: String(row[mappings.tracking]).trim(),customer: row[mappings.name] ? String(row[mappings.name]).trim() : 'ไม่ระบุชื่อ',phone: cleanPhone,address: row[mappings.address] ? String(row[mappings.address]).trim() : 'ไม่ระบุที่อยู่',cod: Number(row[mappings.cod]) || 0,raw_phone: String(rawPhone).trim(),isPhoneCleaned: isFixed});});setCleanedData(listCleaned);setCleansingSummary({ totalRaw: rawRows.length, validCount, fixedPhoneCount, skippedCount });setProcessLogs(prev => [...prev, ✅ ประมวลผลเสร็จสิ้น: ล้างข้อมูลพร้อมส่งขึ้นระบบจำนวน ${validCount} รายการ]);setIsProcessing(false);} catch (err) {setProcessLogs(prev => [...prev, ❌ ล้มเหลว: ${err.message}]);setIsProcessing(false);}};reader.readAsBinaryString(file);};const commitToSupabase = async () => {if (cleanedData.length === 0 || !supabaseClient) return;setIsProcessing(true);setProcessLogs(prev => [...prev, "📡 กำลังเชื่อมต่อเกตเวย์ ยิงข้อมูลเข้าสู่ Supabase..."]);try {const payloads = cleanedData.map(item => ({phone: item.phone,customer: item.customer,track: item.track,cod: item.cod,address: item.address,raw_phone: item.raw_phone}));const { error } = await supabaseClient.from(TABLE_NAME).insert(payloads);if (error) throw error;showToast(ข้อมูลซิงค์ตรงฐานข้อมูล Supabase สำเร็จ ${payloads.length} รายการ!);setProcessLogs(prev => [...prev, 🎉 บันทึกธุรกรรมพัสดุจำนวน ${payloads.length} รายการ ลงฐานข้อมูลหลักเสร็จสมบูรณ์]);setCleanedData([]);fetchAdminData();} catch (err) {showToast(เกิดข้อผิดพลาดในการบันทึก: ${err.message}, 'error');setProcessLogs(prev => [...prev, ❌ ส่งข้อมูลล้มเหลว: ${err.message}]);} finally {setIsProcessing(false);}};return ({/* SYSTEM HEADER */}⚡ EMPIRE COMMAND V48.5 // PROD FIX{currentTime.toLocaleTimeString()}{/* METRICS ROW */}SB PARCELS RECORDS{stats.totalOrders} แถวTODAY COD COLLECTED฿{stats.todayCOD.toLocaleString()}GOAL ACHIEVED{((stats.todayCOD/EMPIRE_GOAL)*100).toFixed(1)}%{/* UNIVERSAL DROPZONE */}📥UPLOAD NEW LOGISTICS FILEวางไฟล์ Excel/CSV เพื่อล้าง ลบส่วนเกินเบอร์โทร และเตรียมส่งข้อมูลเข้าฐานข้อมูลเช็คพัสดุ{/* LIVE CONSOLE LOG */}{processLogs.length > 0 && ({processLogs.map((l, i) => {l})})}{/* DATA CLEANSING PREVIEW */}{cleanedData.length > 0 && (🔍 TRANSMISSION VALIDATION MATRIXนำเข้าข้อมูลดิบ: {cleansingSummary.totalRaw} รายการคัดกรองเบอร์โทรแล้ว: {cleansingSummary.fixedPhoneCount} แถว🚀 ยืนยันบันทึกลง SUPABASE ({cleanedData.length} แถว)TRACK (รหัสพัสดุ)CUSTOMER (ชื่อผู้รับ)RAW PHONE (เบอร์เดิม)PHONE (เบอร์ที่ล้างใหม่)ADDRESS (ที่อยู่)COD (ยอดเงิน){cleanedData.map((item, idx) => ({item.track}{item.customer}{item.raw_phone || '-'}<td className={p-2 font-mono font-bold ${item.isPhoneCleaned ? 'text-yellow-400' : 'text-green-400'}}>{item.phone || '-'} {item.isPhoneCleaned && '✨'}{item.address}฿{item.cod.toLocaleString()}))})}{/* DATABASE PREVIEW PANEL */}📡 สตรีมประวัติข้อมูลย้อนหลัง จากตารางใน SUPABASETRACKCUSTOMERPHONECOD{orders.length === 0 ? (NO LIVE STORAGE DATA DETECTED) : orders.map((o, i) => ({o.track}{o.customer}{o.phone}฿{Number(o.cod || 0).toLocaleString()}))}{/* FOOTER */}EMPIRE CORE V48.5 // VERCEL PRODUCTION FIXED{message && ({message.text})});}const root = ReactDOM.createRoot(document.getElementById('root'));root.render();
+        function addLog(msg) {
+            const container = document.getElementById('logs-container');
+            const p = document.createElement('p');
+            p.className = "mb-4 border-l-2 border-[#7c3aed] pl-4 py-1";
+            p.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            container.prepend(p);
+        }
+    </script>
+</body>
+</html>
