@@ -1,219 +1,354 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EMPIRE COMMAND CENTER V43 - CHAT INTEL</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sriracha&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', 'Sriracha', sans-serif; background-color: #05000a; color: #a78bfa; margin: 0; }
-        .neon-glow { text-shadow: 0 0 15px #7c3aed, 0 0 30px rgba(124,58,237,0.5); }
-        .glass-card { 
-            background: rgba(255, 255, 255, 0.02); 
-            backdrop-filter: blur(50px); 
-            border: 1px solid rgba(255, 255, 255, 0.08);
+import React, { useState, useEffect } from "react";
+
+// ==========================================
+// [VERSION]: V39.1 - THE SOUL REFINEMENT
+// [STATUS]: 🔒 SNAPSHOT LOCKED (GOLD STANDARD)
+// [IMMUTABLE PROTOCOL]: EMPIRE-CORE-V39-LOCK
+// [AESTHETIC]: ARTISTIC ARCHITECT (60-30-10)
+// [RULE]: DO NOT ALTER FILE LOADER & TABLE LOGIC
+// [AUTHORITY]: DARKSIDE COMMAND ONLY ✌️🟣🔥
+// ==========================================
+
+const SUPABASE_URL = "https://nlgecesyjcrrqwiitlyt.supabase.co";
+const SUPABASE_KEY = "sb_publishable_1agyo85-Uxq1VAllYjl1gg_M_utlMbw";
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState("dashboard"); 
+  const [supabaseClient, setSupabaseClient] = useState(null);
+  const [loading, setLoading] = useState(false);
+  
+  // Tracking States
+  const [phone, setPhone] = useState("");
+  const [trackingData, setTrackingData] = useState(null);
+
+  // Admin Data States
+  const [orders, setOrders] = useState([]);
+  const [stats, setStats] = useState({ totalOrders: 0, totalCOD: 0 });
+  const [adminSearch, setAdminSearch] = useState("");
+  const [importStatus, setImportStatus] = useState({ processing: false, count: 0, logs: [] });
+
+  // 🛡️ THE IMMUTABLE PROTOCOL: Gold Standard Loader (LOCKED)
+  useEffect(() => {
+    const scripts = [
+      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+      'https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js'
+    ];
+    let loadedCount = 0;
+    scripts.forEach(src => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.onload = () => {
+        loadedCount++;
+        if (loadedCount === scripts.length && window.supabase) {
+          // @ts-ignore
+          setSupabaseClient(window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY));
         }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        @keyframes pulse-opacity { 0%, 100% { opacity: 0.03; } 50% { opacity: 0.1; } }
-        .bg-pulse { animation: pulse-opacity 5s infinite; }
-    </style>
-</head>
-<body class="overflow-x-hidden selection:bg-[#7c3aed] selection:text-white pb-32">
+      };
+      document.body.appendChild(script);
+    });
+  }, []);
 
-    <div class="fixed inset-0 bg-pulse bg-radial from-[#7c3aed] via-transparent to-transparent pointer-events-none z-0"></div>
+  const fetchAdminData = async () => {
+    if (!supabaseClient) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabaseClient
+        .from("parcels_bb")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-    <div class="relative z-10 max-w-7xl mx-auto px-6 pt-12">
-        <!-- 🧭 Header & Empire Clock (นากา) -->
-        <header class="flex flex-col lg:flex-row justify-between items-center border-b border-white/5 pb-12 mb-12 gap-8">
-            <div class="text-center lg:text-left">
-                <h1 class="text-6xl md:text-8xl font-black italic tracking-tighter uppercase text-[#7c3aed] neon-glow leading-none">BB EMPIRE</h1>
-                <p class="text-gray-600 text-[10px] font-black uppercase tracking-[1.5em] italic opacity-50 mt-4">Chat Intelligence Sovereign V43.0</p>
-            </div>
-            <div class="bg-[#0f071a] border border-[#3d1a6d] px-12 py-8 rounded-[3rem] shadow-[0_0_60px_rgba(124,58,237,0.25)] text-center relative overflow-hidden">
-                <p class="text-[10px] text-[#7c3aed] font-black uppercase tracking-widest mb-3 italic">Empire Standard Time</p>
-                <div id="clock" class="text-6xl font-mono font-black text-white tracking-widest leading-none">00:00:00</div>
-            </div>
-        </header>
+      if (!error && data) {
+        setOrders(data);
+        const totalCOD = data.reduce((sum, item) => sum + Number(item.cod_amount || 0), 0);
+        setStats({ totalOrders: data.length, totalCOD });
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        <nav class="flex justify-center gap-6 mb-16 overflow-x-auto no-scrollbar py-4">
-            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="tab-btn px-12 py-6 rounded-[2.5rem] border-2 border-[#7c3aed] bg-[#7c3aed] text-white font-black text-xs uppercase tracking-[0.2em] transition-all">📊 Dashboard</button>
-            <button onclick="switchTab('chat')" id="btn-chat" class="tab-btn px-12 py-6 rounded-[2.5rem] border-2 border-white/5 bg-white/5 text-gray-500 font-black text-xs uppercase tracking-[0.2em] transition-all">💬 Chat Intel</button>
-            <button onclick="switchTab('ops')" id="btn-ops" class="tab-btn px-12 py-6 rounded-[2.5rem] border-2 border-white/5 bg-white/5 text-gray-500 font-black text-xs uppercase tracking-[0.2em] transition-all">📥 Command</button>
-        </nav>
+  useEffect(() => {
+    if (activeTab === "dashboard") fetchAdminData();
+  }, [supabaseClient, activeTab]);
 
-        <!-- 📊 Dashboard Section -->
-        <div id="tab-dashboard" class="tab-content animate-in fade-in duration-700">
-            <div class="grid grid-cols-1 xl:grid-cols-4 gap-12 mb-16">
-                <div class="xl:col-span-1 glass-card p-16 rounded-[4.5rem] text-center border-l-8 border-[#7c3aed]">
-                    <p class="text-gray-600 text-[11px] font-black uppercase tracking-widest mb-4 italic">Total Houses</p>
-                    <p id="stat-orders" class="text-9xl font-black text-[#7c3aed] italic leading-none">0</p>
-                </div>
-                <div class="xl:col-span-3 glass-card p-16 rounded-[4.5rem] flex flex-col justify-center relative overflow-hidden">
-                    <p class="text-gray-600 text-[11px] font-black uppercase tracking-widest mb-6 italic">Total COD Balance</p>
-                    <p id="stat-cod" class="text-7xl md:text-[12rem] font-black text-white italic leading-none drop-shadow-2xl">฿0</p>
-                </div>
-            </div>
-        </div>
+  const cleanName = (name) => name ? name.replace(/^[0-9\s.]+/, "").replace(/^(คุณ|นาย|นางสาว|นาง|👤)\s*/gi, "").trim() : "ลูกค้า VIP";
 
-        <!-- 💬 Chat Intel Section -->
-        <div id="tab-chat" class="tab-content hidden animate-in slide-in-from-bottom-10 duration-700">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2 glass-card p-10 rounded-[4rem]">
-                    <div class="flex items-center justify-between mb-8">
-                        <h2 class="text-2xl font-black italic flex items-center gap-3 text-white uppercase">
-                            <i data-lucide="message-square" class="text-[#7c3aed]"></i> Incoming Ghost Messages
-                        </h2>
-                        <span class="text-[10px] font-black text-green-500 animate-pulse">POLLING ACTIVE</span>
-                    </div>
-                    <div id="chat-logs" class="space-y-4 h-[500px] overflow-y-auto custom-scrollbar pr-4 font-mono text-xs">
-                        <!-- Polled messages will appear here -->
-                    </div>
-                </div>
-                <div class="lg:col-span-1 space-y-8">
-                    <div class="glass-card p-10 rounded-[4rem] border-t-4 border-[#7c3aed]">
-                        <h3 class="text-lg font-black text-white mb-6 uppercase italic">Quick Reply Matrix</h3>
-                        <div class="space-y-3">
-                            <button class="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-[#a78bfa] hover:bg-[#7c3aed] hover:text-white transition-all">ส่งเลขพัสดุ (Auto)</button>
-                            <button class="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-[#a78bfa] hover:bg-[#7c3aed] hover:text-white transition-all">ยืนยันยอดโอน (VIP)</button>
-                            <button class="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-[#a78bfa] hover:bg-[#7c3aed] hover:text-white transition-all">ขออภัยสินค้าหมด</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  // 🔍 LOCKED LOGIC: Hunter Logic (ห้ามเปลี่ยนแปลงตามบัญชา)
+  const handleSearch = async () => {
+    if (!supabaseClient) return;
+    const inputRaw = phone.trim();
+    if (inputRaw.length < 4) return;
+    
+    setLoading(true);
+    setTrackingData(null);
+    try {
+      const { data, error } = await supabaseClient
+        .from("parcels_bb")
+        .select("consignee_name, tracking_no, cod_amount")
+        .or(`phone_no.ilike.%${inputRaw}%,tracking_no.ilike.%${inputRaw}%`)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-        <!-- 📥 Command Section (Loader) -->
-        <div id="tab-ops" class="tab-content hidden animate-in zoom-in-95 duration-700">
-            <div class="max-w-5xl mx-auto mt-20 grid grid-cols-1 md:grid-cols-2 gap-16">
-                <div class="glass-card p-24 rounded-[6rem] text-center relative group cursor-pointer hover:bg-[#1a0b2e] transition-all">
-                    <input type="file" id="file-upload" accept=".xls,.xlsx" class="absolute inset-0 opacity-0 cursor-pointer z-20">
-                    <div class="text-[12rem] mb-10 group-hover:scale-110 transition-transform">📂</div>
-                    <h2 class="text-5xl font-black uppercase italic text-white">LOADER</h2>
-                </div>
-                <div id="import-logs" class="bg-black/90 rounded-[6rem] p-12 font-mono text-[12px] h-[500px] overflow-y-auto border border-white/5 text-gray-600 custom-scrollbar">
-                    <p class="text-[#7c3aed] font-black border-b border-white/5 pb-6 mb-10">#>>> SYSTEM_OPS_LOG</p>
-                    <div id="logs-container" class="space-y-4"></div>
-                </div>
-            </div>
-        </div>
-    </div>
+      if (data) {
+        setTrackingData(data);
+      } else {
+        console.log("Target not found in BB Database");
+      }
+      if (error) throw error;
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    <footer class="fixed bottom-0 left-0 w-full py-12 bg-[#05000a]/95 backdrop-blur-3xl border-t border-white/5 text-center z-50">
-        <p class="text-[11px] text-gray-800 font-black uppercase tracking-[5em] italic opacity-30">The Chat Sovereign • V43.0 • Ghost Protocol</p>
-    </footer>
-
-    <script>
-        const SUPABASE_URL = "https://nlgecesyjcrrqwiitlyt.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_1agyo85-Uxq1VAllYjl1gg_M_utlMbw";
-        let supabaseClient;
-        let allOrders = [];
-
-        window.onload = () => {
-            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-            updateClock();
-            setInterval(updateClock, 1000);
-            fetchData();
-            lucide.createIcons();
-            simulateChatPolling();
-        };
-
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').innerText = now.toLocaleTimeString('th-TH', { hour12: false });
-        }
-
-        async function fetchData() {
-            const { data, error } = await supabaseClient.from("parcels_bb").select("*").order("created_at", { ascending: false });
-            if (!error && data) {
-                allOrders = data;
-                renderDashboard();
-            }
-        }
-
-        function renderDashboard() {
-            const totalCOD = allOrders.reduce((sum, item) => sum + Number(item.cod_amount || 0), 0);
-            document.getElementById('stat-orders').innerText = allOrders.length;
-            document.getElementById('stat-cod').innerText = '฿' + totalCOD.toLocaleString();
-        }
-
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.getElementById('tab-' + tabId).classList.remove('hidden');
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.replace('bg-[#7c3aed]', 'bg-white/5');
-                btn.classList.replace('text-white', 'text-gray-500');
-                btn.classList.replace('border-[#7c3aed]', 'border-white/5');
+  // 📥 LOCKED LOGIC: ระบบโยนไฟล์ (ห้ามเปลี่ยนแปลงตามบัญชา)
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !supabaseClient) return;
+    setImportStatus({ processing: true, count: 0, logs: ["🕵️ เริ่มสกัดดาต้าพิกัดอาณาจักรบีบี..."] });
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        // @ts-ignore
+        const workbook = window.XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        // @ts-ignore
+        const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        const batch = [];
+        rows.forEach((row, i) => {
+          if (i === 0) return;
+          const track = String(row[2] || "").trim();
+          if (!track.toUpperCase().startsWith("TH")) return;
+          const phoneNum = String(row[4] || "").replace(/\D/g, "");
+          if (phoneNum.length >= 9) {
+            batch.push({
+              tracking_no: track.toUpperCase(),
+              phone_no: phoneNum,
+              consignee_name: cleanName(String(row[3] || "")),
+              address: String(row[5] || ""),
+              cod_amount: parseFloat(String(row[9] || "0").replace(/,/g, "")) || 0,
+              product: "ตรวจสอบแล้ว",
+              status: "SHIPPED"
             });
-            const activeBtn = document.getElementById('btn-' + tabId);
-            activeBtn.classList.replace('bg-white/5', 'bg-[#7c3aed]');
-            activeBtn.classList.replace('text-gray-500', 'text-white');
-            activeBtn.classList.replace('border-white/5', 'border-[#7c3aed]');
-        }
-
-        function simulateChatPolling() {
-            const chats = [
-                { user: "ลูกค้า VIP #201", msg: "สอบถามเลขพัสดุครับ เบอร์ 081234xxxx", intent: "🛰️ TRACKING" },
-                { user: "ลูกค้าใหม่", msg: "สนใจม่อนรุ้ง 2 คอตครับ มีของไหม", intent: "💰 SALES" },
-                { user: "สมาชิกเงามืด", msg: "โอนแล้วนะครับ สลิปส่งในแชทแล้ว", intent: "💰 MONEY_IN" }
-            ];
-            const container = document.getElementById('chat-logs');
-            chats.forEach((chat, i) => {
-                setTimeout(() => {
-                    const div = document.createElement('div');
-                    div.className = "p-5 bg-black/40 border border-white/5 rounded-2xl animate-in fade-in slide-in-from-left-5 mb-3";
-                    div.innerHTML = `
-                        <div class="flex justify-between mb-2 text-[10px] font-black uppercase tracking-widest">
-                            <span class="text-[#7c3aed]">${chat.user}</span>
-                            <span class="text-green-500">${chat.intent}</span>
-                        </div>
-                        <p class="text-gray-400 text-sm font-medium">${chat.msg}</p>
-                    `;
-                    container.prepend(div);
-                }, i * 2000);
-            });
-        }
-
-        document.getElementById('file-upload').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            addLog("🕵️ กำลังสแกนคลังแสงข้อมูล...");
-            reader.onload = async (evt) => {
-                const data = new Uint8Array(evt.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
-                const batch = [];
-                rows.slice(1).forEach(row => {
-                    if (row[2] && String(row[2]).toUpperCase().startsWith("TH")) {
-                        batch.push({
-                            tracking_no: String(row[2]).trim().toUpperCase(),
-                            phone_no: String(row[4] || "").replace(/\D/g, ""),
-                            consignee_name: String(row[3] || "ลูกค้า VIP").trim(),
-                            cod_amount: parseFloat(String(row[9] || "0").replace(/,/g, "")) || 0
-                        });
-                    }
-                });
-                if (batch.length > 0) {
-                    const { error } = await supabaseClient.from("parcels_bb").upsert(batch, { onConflict: 'tracking_no' });
-                    if (!error) {
-                        addLog(`🔥 บรรจุกระสุน ${batch.length} นัด สำเร็จ!`);
-                        fetchData();
-                    }
-                }
-            };
-            reader.readAsArrayBuffer(file);
+          }
         });
+        if (batch.length === 0) throw new Error("ไฟล์ไม่สมบูรณ์");
+        const { error } = await supabaseClient.from("parcels_bb").upsert(batch, { onConflict: 'tracking_no' });
+        if (error) throw error;
+        setImportStatus({ processing: false, count: batch.length, logs: [`🔥 บรรจุกระสุน ${batch.length} นัด สำเร็จ!`] });
+      } catch (err) {
+        setImportStatus({ processing: false, count: 0, logs: [`⚠️ ล้มเหลว: ${err.message}`] });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
 
-        function addLog(msg) {
-            const container = document.getElementById('logs-container');
-            const p = document.createElement('p');
-            p.className = "mb-4 border-l-2 border-[#7c3aed] pl-4 py-1";
-            p.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            container.prepend(p);
+  const filteredOrders = orders.filter(o => 
+    (o.phone_no || "").includes(adminSearch) || 
+    (o.tracking_no || "").toLowerCase().includes(adminSearch.toLowerCase())
+  );
+
+  return (
+    <main className="min-h-screen flex flex-col items-center bg-[#05000a] text-white font-sans relative overflow-x-hidden selection:bg-[#7c3aed] selection:text-white pb-40">
+      <link href="https://fonts.googleapis.com/css2?family=Rubik+Puddles&family=Sriracha&family=Inter:wght@400;700;900&display=swap" rel="stylesheet" />
+      
+      {/* 🌌 Background Layer - 60% Luxury Base */}
+      <div className="fixed inset-0 bg-gradient-to-b from-[#05000a] via-[#0d001a] to-[#05000a] z-0" />
+      
+      {/* ✨ Emotional Interaction Glow (Glassmorphism Depth) */}
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[1400px] aspect-square bg-radial from-[#7c3aed]/10 via-transparent to-transparent blur-[180px] pointer-events-none animate-pulse z-0" />
+      
+      {/* 🧭 NAVIGATION TABS - Aesthetic Hierarchy */}
+      <nav className="relative z-30 w-full max-w-5xl mt-12 px-6 flex justify-center gap-6 overflow-x-auto no-scrollbar py-6">
+        {[
+          { id: 'dashboard', label: '📊 Dashboard', active: 'bg-[#7c3aed] shadow-[0_0_50px_rgba(124,58,237,0.5)] border-[#7c3aed]' },
+          { id: 'tracking', label: '🛰️ Tracking', active: 'bg-white text-black shadow-[0_0_50px_rgba(255,255,255,0.5)] border-white' },
+          { id: 'ops', label: '📥 Command', active: 'bg-[#4c1d95] shadow-[0_0_50px_rgba(76,29,149,0.5)] border-[#4c1d95]' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-12 py-7 rounded-[3rem] border-2 transition-all duration-700 font-black text-xs uppercase tracking-[0.4em] backdrop-blur-3xl whitespace-nowrap ${activeTab === tab.id ? tab.active : 'bg-white/5 text-gray-500 border-white/5 hover:border-white/20 hover:text-white'}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .neon-glow-violet { text-shadow: 0 0 20px #7c3aed, 0 0 40px rgba(124,58,237,0.6); }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #7c3aed; border-radius: 20px; box-shadow: 0 0 10px #7c3aed; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        .glass-card { 
+          background: rgba(255, 255, 255, 0.03); 
+          backdrop-filter: blur(60px); 
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          box-shadow: 0 40px 80px -12px rgba(0, 0, 0, 0.8);
         }
-    </script>
-</body>
-</html>
+        
+        @keyframes rotate { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .neon-border-trace { position: relative; padding: 2px; overflow: hidden; }
+        .neon-border-trace::before {
+          content: ""; position: absolute; width: 300%; height: 300%;
+          top: -100%; left: -100%;
+          background: conic-gradient(transparent, transparent, transparent, #7c3aed, #fff, #7c3aed);
+          animation: rotate 10s linear infinite; z-index: 0;
+        }
+      `}} />
+
+      <div className="relative z-20 w-full max-w-[1400px] px-8 mt-12">
+        
+        {activeTab === "dashboard" && (
+          <div className="animate-in fade-in zoom-in-95 duration-1000 space-y-24 mt-16 pb-32">
+            {/* Header - Wealth Hierarchy */}
+            <header className="flex flex-col xl:flex-row justify-between items-center xl:items-end border-b border-white/5 pb-20 gap-16">
+              <div className="space-y-6 text-center xl:text-left">
+                <h1 className="text-7xl md:text-[14rem] font-black italic tracking-tighter uppercase text-[#7c3aed] neon-glow-violet leading-none select-none">BB WEALTH</h1>
+                <p className="text-gray-600 text-[11px] font-black uppercase tracking-[2.5em] italic pl-4 opacity-40">Empire Intelligence Command</p>
+              </div>
+              <div className="text-center xl:text-right group">
+                <p className="text-gray-700 text-xs font-black uppercase tracking-[0.5em] mb-6 italic opacity-30">Consolidated Cash Reserve</p>
+                <p className="text-8xl md:text-[18rem] font-black italic tracking-tighter text-white leading-none drop-shadow-[0_20px_50px_rgba(0,0,0,0.8)] transition-all group-hover:scale-105 duration-700">
+                  ฿{stats.totalCOD.toLocaleString()}
+                </p>
+              </div>
+            </header>
+
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-16">
+              {/* Stat Card - Whitespace is Luxury */}
+              <div className="xl:col-span-1 glass-card p-20 rounded-[5.5rem] flex flex-col justify-center text-center group hover:border-[#7c3aed]/30 transition-all duration-700">
+                <p className="text-gray-700 text-xs font-black uppercase tracking-[0.6em] mb-10 italic opacity-40">Territories Secured</p>
+                <p className="text-9xl md:text-[14rem] font-black italic text-[#7c3aed] leading-none drop-shadow-2xl">{stats.totalOrders}</p>
+                <p className="text-xs text-gray-800 font-black uppercase mt-12 tracking-[1.5em] opacity-40">HOUSES</p>
+              </div>
+
+              {/* Data Table - The Locked Table Logic */}
+              <div className="xl:col-span-3 glass-card p-14 md:p-20 rounded-[5.5rem]">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-20 gap-10">
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-black uppercase tracking-[1em] italic text-[#7c3aed] opacity-60">LIVE_DATA_FEED</h3>
+                    <div className="h-1 w-20 bg-[#7c3aed] rounded-full opacity-30" />
+                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="SCANNIG TARGET COORDINATES..."
+                    value={adminSearch}
+                    onChange={(e) => setAdminSearch(e.target.value)}
+                    className="bg-white/5 border border-white/10 rounded-[2.5rem] px-12 py-8 text-sm focus:border-[#7c3aed] outline-none w-full md:w-2/3 text-white placeholder:text-gray-900 font-bold tracking-[0.3em] transition-all"
+                  />
+                </div>
+                <div className="overflow-x-auto h-[600px] custom-scrollbar pr-6">
+                  <table className="w-full text-left">
+                    <thead className="text-gray-800 uppercase font-black tracking-[0.5em] text-[10px] sticky top-0 bg-[#0d001a]/95 backdrop-blur-md border-b border-white/5 z-10">
+                      <tr><th className="px-10 py-12">Tracking ID</th><th className="px-10 py-12">Target Name</th><th className="px-10 py-12 text-right">Value (COD)</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {filteredOrders.map((ord, i) => (
+                        <tr key={i} className="hover:bg-white/5 transition-all group cursor-default">
+                          <td className="px-10 py-14 font-mono text-[#7c3aed] font-black text-xl md:text-2xl group-hover:text-white transition-colors tracking-tighter">{ord.tracking_no}</td>
+                          <td className="px-10 py-14">
+                            <p className="text-gray-300 font-black text-xl md:text-3xl" style={{ fontFamily: "'Sriracha', cursive" }}>{cleanName(ord.consignee_name)}</p>
+                            <p className="text-[11px] text-gray-700 font-black tracking-[0.4em] mt-3 opacity-50">{ord.phone_no}</p>
+                          </td>
+                          <td className="px-10 py-14 text-right font-black text-white text-3xl md:text-5xl italic drop-shadow-lg">฿{Number(ord.cod_amount).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "tracking" && (
+          <div className="max-w-2xl mx-auto animate-in slide-in-from-bottom-12 duration-1000 mt-20 md:mt-40 text-center">
+            <h1 className="text-8xl md:text-[15rem] font-black tracking-tighter bg-gradient-to-r from-white via-[#7c3aed] to-white bg-[length:200%_auto] text-transparent bg-clip-text animate-[logoSweep_7s_linear_infinite] drop-shadow-[0_0_60px_rgba(124,58,237,0.3)] leading-tight mb-8" style={{ fontFamily: "'Rubik Puddles', cursive" }}>BB STORE</h1>
+            <p className="text-4xl md:text-6xl font-bold text-white tracking-[0.5em] uppercase italic mt-12 opacity-90" style={{ fontFamily: "'Sriracha', cursive" }}>✧ บุหรี่นอกราคาส่ง ✧</p>
+            
+            <div className="mt-32 space-y-16">
+              <input 
+                type="text" 
+                value={phone} 
+                onChange={(e) => setPhone(e.target.value)} 
+                placeholder="กรอกเบอร์โทร หรือ เลขพัสดุ" 
+                className="w-full p-14 md:p-16 text-center text-4xl md:text-7xl bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[4rem] outline-none focus:border-[#7c3aed] text-white font-black tracking-widest transition-all duration-700 placeholder:text-gray-900 shadow-[0_60px_120px_rgba(0,0,0,0.7)]" 
+              />
+              <div className="neon-border-trace rounded-[4.5rem] group active:scale-95 cursor-pointer shadow-3xl" onClick={handleSearch}>
+                <div className="relative z-10 w-full py-12 md:py-16 text-center bg-gradient-to-br from-[#4c1d95]/95 to-[#7c3aed]/95 rounded-[calc(4.5rem-2px)]">
+                  <span className="text-white font-black text-3xl md:text-6xl uppercase tracking-[0.7em] drop-shadow-2xl">FIND MY ORDER</span>
+                </div>
+              </div>
+            </div>
+
+            {trackingData && (
+              <div className="mt-40 space-y-20 animate-in zoom-in-90 duration-700 pb-32">
+                <div className="glass-card p-24 rounded-[6rem] border border-white/10 shadow-4xl relative overflow-hidden text-left">
+                  <div className="absolute top-0 right-0 p-10 text-[12px] font-black text-[#7c3aed] opacity-30 tracking-[0.6em] uppercase italic">Member Identity</div>
+                  <span className="text-sm text-[#7c3aed] font-black uppercase tracking-[1.2em] italic opacity-70">Empire VIP Member</span>
+                  <h2 className="text-7xl md:text-[10rem] text-white font-black uppercase tracking-tight mt-16 leading-tight drop-shadow-2xl" style={{ fontFamily: "'Sriracha', cursive" }}>{cleanName(trackingData.consignee_name)}</h2>
+                </div>
+                <div className="py-16">
+                    <p className="text-sm text-gray-700 uppercase font-black tracking-[2em] opacity-40 italic">COD SETTLEMENT VALUE</p>
+                    <p className="text-[10rem] md:text-[20rem] text-white font-black neon-glow-violet mt-16 leading-none italic tracking-tighter drop-shadow-2xl">฿{Number(trackingData.cod_amount).toLocaleString()}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "ops" && (
+          <div className="max-w-5xl mx-auto animate-in fade-in duration-700 mt-20 space-y-32 pb-40">
+             <header className="text-center border-b border-white/5 pb-32">
+                <h1 className="text-7xl md:text-[11rem] font-black italic tracking-tighter uppercase text-white drop-shadow-2xl">COMMAND</h1>
+                <p className="text-gray-600 text-[12px] font-black uppercase tracking-[2em] mt-12 italic opacity-40">Intelligence Resources & Strategic Feed</p>
+             </header>
+             
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-24">
+               {/* Loader Section - ห้ามเปลี่ยนระบบโยนไฟล์ */}
+               <div className="neon-border-trace rounded-[7rem]">
+                 <div className="relative z-10 p-28 md:p-40 text-center bg-[#0d001a]/95 rounded-[calc(7rem-2px)] group cursor-pointer border border-white/5 transition-all hover:bg-[#1a0b2e]">
+                   <input type="file" onChange={handleFileUpload} accept=".xls,.xlsx" className="absolute inset-0 opacity-0 cursor-pointer z-20" />
+                   <div className="space-y-16">
+                     <div className="text-[14rem] md:text-[20rem] group-hover:scale-110 group-hover:rotate-6 transition-all duration-1000 filter drop-shadow-[0_0_100px_rgba(124,58,237,0.2)]">📁</div>
+                     <h2 className="text-5xl md:text-8xl font-black uppercase italic tracking-tighter text-white">LOADER</h2>
+                     <p className="text-gray-800 text-sm font-black uppercase tracking-[1em] italic">Drop Coordinates</p>
+                   </div>
+                 </div>
+               </div>
+
+               <div className="glass-card rounded-[7rem] p-20 font-mono text-sm md:text-base h-[700px] md:h-[900px] overflow-y-auto border border-white/10 shadow-3xl">
+                  <p className="text-violet-400 font-black border-b border-white/5 pb-10 mb-16 tracking-widest uppercase italic text-lg">{`#>>> OPS_LOG: SOUL_PROTOCOL_ACTIVE`}</p>
+                  <div className="space-y-8">
+                    {importStatus.logs.map((log, i) => (
+                      <p key={i} className={`leading-relaxed ${log.includes("🔥") ? "text-green-500 font-bold" : "text-gray-600"}`}>
+                        {`[${new Date().toLocaleTimeString()}] ${log}`}
+                      </p>
+                    ))}
+                  </div>
+                  {importStatus.processing && <p className="text-[#7c3aed] animate-pulse italic mt-16 font-black uppercase tracking-[1.5em] text-center">🌀 บรรจุกระสุนเข้าสู่คลังแสง...</p>}
+               </div>
+             </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Footer - Negative Space Luxury */}
+      <footer className="fixed bottom-0 left-0 w-full py-16 bg-[#05000a]/95 backdrop-blur-3xl border-t border-white/5 text-center z-50">
+        <p className="text-[11px] text-gray-700 font-black uppercase tracking-[4em] md:tracking-[8em] italic opacity-40 select-none">The Soul Protocol • V39.1 • Gold Standard Locked</p>
+      </footer>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes logoSweep { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+      `}} />
+    </main>
+  );
+}
