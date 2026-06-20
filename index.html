@@ -151,47 +151,60 @@
             };
 
             const handleFileUpload = async (event) => {
-                const file = event.target.files[0];
-                if (!file || !supabaseClient) return;
-                setImportStatus({ processing: true, count: 0, logs: ["📡 วิเคราะห์พิกัด..."] });
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        const data = new Uint8Array(e.target.result);
-                        const workbook = XLSX.read(data, { type: 'array' });
-                        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                        const header = rows[0].map(h => String(h || "").replace(/\s/g, ""));
-                        const idx = {
-                            track: header.findIndex(h => h.includes("เลขพัสดุ")),
-                            name: header.findIndex(h => h.includes("ชื่อผู้รับ")),
-                            phone: header.findIndex(h => h.includes("เบอร์ผู้รับ")),
-                            cod: header.findIndex(h => h.includes("ยอดCOD")),
-                            address: header.findIndex(h => h.includes("ที่อยู่ที่รับ"))
-                        };
-                        const batch = [];
-                        rows.forEach((row, i) => {
-                            if (i === 0) return; 
-                            const track = String(row[idx.track > -1 ? idx.track : 3] || "").trim().toUpperCase();
-                            if (!track || track.length < 5) return;
-                            batch.push({
-                                tracking_no: track,
-                                phone_no: String(row[idx.phone > -1 ? idx.phone : 11] || "").replace(/\D/g, ""),
-                                consignee_name: String(row[idx.name > -1 ? idx.name : 10] || "ลูกค้า VIP").replace(/^[0-9\s.]+/, "").trim(),
-                                address: String(row[idx.address > -1 ? idx.address : 13] || ""),
-                                cod_amount: parseFloat(String(row[idx.cod > -1 ? idx.cod : 20] || "0").replace(/,/g, "")) || 0,
-                                product: "AUTO_SYNC_V48.2",
-                                status: "SHIPPED"
-                            });
-                        });
-                        const { error } = await supabaseClient.from(TABLE_NAME).upsert(batch, { onConflict: 'tracking_no' });
-                        if (error) throw error;
-                        setImportStatus({ processing: false, count: batch.length, logs: ["🔥 บรรจุสำเร็จ " + batch.length] });
-                        fetchAdminData();
-                    } catch (err) { setImportStatus({ processing: false, count: 0, logs: ["⚠️ " + err.message] }); }
-                };
-                reader.readAsArrayBuffer(file);
+    const file = event.target.files[0];
+    if (!file || !supabaseClient) return;
+
+    setImportStatus({ processing: true, count: 0, logs: ["📡 ปรับจูนโครงสร้างอิสระ..."] });
+    
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            
+            // ระบบสแกนหัวตารางอัตโนมัติ
+            const rawHeader = rows[0].map(h => String(h || "").trim());
+            const findIdx = (keywords) => rawHeader.findIndex(h => keywords.some(k => h.includes(k)));
+            
+            const idx = {
+                track: findIdx(["เลขพัสดุ", "พัสดุ", "Order ID"]),
+                name: findIdx(["ชื่อผู้รับ", "ชื่อ", "Customer"]),
+                phone: findIdx(["เบอร์ผู้รับ", "เบอร์", "Phone"]),
+                cod: findIdx(["ยอดCOD", "ยอดเงิน", "COD"]),
+                address: findIdx(["ที่อยู่ที่รับ", "ที่อยู่", "Address"])
             };
+
+            const batch = [];
+            for(let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                const trackVal = row[idx.track > -1 ? idx.track : 3]; // Fallback ไปที่คอลัมน์ 4 ถ้าหาไม่เจอ
+                if (!trackVal) continue;
+
+                batch.push({
+                    tracking_no: String(trackVal).trim().toUpperCase(),
+                    phone_no: String(row[idx.phone > -1 ? idx.phone : 11] || "").replace(/\D/g, ""),
+                    consignee_name: String(row[idx.name > -1 ? idx.name : 10] || "ลูกค้า VIP").trim(),
+                    address: String(row[idx.address > -1 ? idx.address : 13] || ""),
+                    cod_amount: parseFloat(String(row[idx.cod > -1 ? idx.cod : 20] || "0").replace(/[^0-9.]/g, "")) || 0,
+                    status: "SHIPPED",
+                    updated_at: new Date().toISOString()
+                });
+            }
+
+            // [TABLE_NAME] ถูกดึงมาจากตัวแปรด้านบนแบบไดนามิก
+            const { error } = await supabaseClient.from(TABLE_NAME).upsert(batch, { onConflict: 'tracking_no' });
+            if (error) throw error;
+            
+            setImportStatus({ processing: false, count: batch.length, logs: ["✅ ภารกิจสำเร็จ: อัปโหลดสู่ตาราง " + TABLE_NAME + " เรียบร้อย"] });
+            fetchAdminData();
+        } catch (err) {
+            setImportStatus({ processing: false, count: 0, logs: ["❌ ERROR: " + err.message] });
+        }
+    };
+    reader.readAsArrayBuffer(file);
+};
 
             return (
                 <div className="min-h-screen relative p-4 md:p-12 overflow-hidden">
@@ -302,7 +315,9 @@
                                     </div>
                                     <div className="bg-black/98 p-8 md:p-12 rounded-sm font-mono text-[11px] md:text-[13px] h-[400px] md:h-[550px] overflow-y-auto border border-white/5 custom-scrollbar shadow-inner">
                                         <p className="font-black border-b border-white/10 pb-6 mb-8 tracking-[0.6em] uppercase italic text-xs" style={{ color: ID.color }}>#>>> Empire_Log</p>
-                                        {importStatus.logs.map((log, i) => (<p key={i} className={`mb-4 leading-relaxed ${log.includes("🔥") ? "text-white font-black" : "text-white/30"}`}>{`[${new Date().toLocaleTimeString()}] ${log}`}</p>))}
+                                    {importStatus.logs.slice(-10).map((log, i) => ( 
+    <p key={i} className="mb-2 text-[10px] opacity-60">... {log}</p> 
+))}
                                     </div>
                                 </div>
                             </div>
